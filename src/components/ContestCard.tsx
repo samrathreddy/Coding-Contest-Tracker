@@ -5,12 +5,13 @@ import { PLATFORMS, CONTEST_TYPE_LABELS, IST_TIMEZONE } from '@/utils/constants'
 import { CountdownTimer } from './CountdownTimer';
 import { Bookmark } from './Bookmark';
 import { YouTubeLink } from './YouTubeLink';
-import { ExternalLink, Clock, Calendar, Trophy } from 'lucide-react';
+import { ExternalLink, Clock, Calendar, Trophy, Bell } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { findProblemSolution } from '@/utils/api';
+import { generateGoogleCalendarUrl, createCalendarEventDescription } from '@/utils/calendar';
 
 interface ContestCardProps {
   contest: BookmarkedContest;
@@ -179,16 +180,40 @@ export function ContestCard({ contest, onToggleBookmark }: ContestCardProps) {
       </CardContent>
       
       <CardFooter className="p-4 pt-2 flex justify-between items-center gap-2 mt-auto">
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-medium hover:bg-primary/90 transition-colors"
-          onClick={e => e.stopPropagation()}
-        >
-          <Trophy className="h-3.5 w-3.5" />
-          Join Contest
-        </a>
+        <div className="flex items-center gap-2">
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-medium hover:bg-primary/90 transition-colors"
+            onClick={e => e.stopPropagation()}
+          >
+            <Trophy className="h-3.5 w-3.5" />
+            Join Contest
+          </a>
+          
+          {/* Only show "Add to Reminder" for upcoming contests */}
+          {status === 'upcoming' && (
+            <a
+              href={generateGoogleCalendarUrl(
+                name,
+                createCalendarEventDescription(name, platform, url),
+                url,
+                startTime,
+                endTime,
+                30 // 30 minutes reminder
+              )}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 text-white rounded-md text-xs font-medium hover:bg-blue-600 transition-colors"
+              onClick={e => e.stopPropagation()}
+              title="Add to Google Calendar with 30 min reminder"
+            >
+              <Bell className="h-3.5 w-3.5" />
+              Remind Me
+            </a>
+          )}
+        </div>
         
         {status === 'past' && solutionUrl && (
           <YouTubeLink url={solutionUrl} />
