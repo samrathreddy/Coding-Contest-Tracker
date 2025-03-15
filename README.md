@@ -17,6 +17,8 @@ Contest Tracker is a comprehensive solution designed to help competitive program
 - **Multi-Platform Integration**: Aggregates contests from LeetCode, Codeforces, Codechef.
 - **Real-time Updates**: Leverages platform APIs to provide the most current contest schedules.
 - **Contest Filtering**: Sort and filter contests by platform, date, duration, and type.
+- **Smart Match**: Automatically matched with the correct tutorial video for the contest from the respective platform playlist.
+- **Reminder**: Integrates with Google Calendar to remind you of the upcoming contests.
 - **Theme Support**: Elegant light and dark mode for comfortable viewing in any environment.
 - **Video Integration**: Watch contest-related tutorials and explanations directly within the app.
 - **Responsive Design**: Full functionality across desktop and mobile devices.
@@ -44,7 +46,7 @@ The application integrates with the following APIs:
 - **Codeforces**: `https://codeforces.com/api/contest.list`
 - **Codechef**: `https://www.codechef.com/api/list/contests/all?sort_by=START&sorting_order=asc&offset=0&mode=all`
 - **YouTube**: `https://www.googleapis.com/youtube/v3/search` (For contest tutorials and video content)
-
+- **Google Calendar**: `https://calendar.google.com/calendar/r/eventedit?action=TEMPLATE&text=${encodedTitle}&details=${encodedDescription}&location=${encodedLocation}&dates=${dates}&gm=false&reminders=VALUE=popup:${reminderMinutes}` (For reminders)
 - **CORS Proxy**: `https://api.allorigins.win/raw` (Used to bypass CORS restrictions)
 
 Note: For LeetCode past contests, custom date calculation is used as no direct API is available.
@@ -130,10 +132,8 @@ yarn test
 **Solution**: Developed a sophisticated date calculation system that correctly determines the next contest dates based on historical patterns, even when API data is unavailable.
 
 ## 🔮 Future Enhancements
-
 - User authentication for personalized experiences
 - Contest performance tracking and statistics
-- Integration with calendar applications (Google Calendar, iCal)
 - Community features like discussion boards for each contest
 
 ## 🙋‍♂️ Assignment Information

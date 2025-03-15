@@ -1,4 +1,6 @@
 import { delay, SOLUTION_LINKS_KEY, showErrorToast } from './common';
+import { Contest } from '../types';
+import { smartMatchContestVideos } from '@/services/youtube';
 
 // Add solution link to a contest
 export async function addSolutionLink(contestId: string, solutionLink: string): Promise<boolean> {
@@ -60,5 +62,46 @@ export async function removeSolutionLink(contestId: string): Promise<boolean> {
     console.error('Error removing solution link:', error);
     showErrorToast('Failed to remove solution link. Please try again later.');
     return false;
+  }
+}
+
+// Perform smart matching and save the results
+export async function performSmartMatching(contests: Contest[]): Promise<{
+  stats: Record<string, any>;
+  totalMatched: number;
+  totalContests: number;
+  totalSkipped: number;
+}> {
+  try {
+    // Get existing manual links
+    const manualLinks = getSavedSolutionLinks();
+    
+    // Execute smart matching
+    const { resultMap: smartMatchedLinks, stats } = await smartMatchContestVideos(contests);
+    
+    // Combine links, prioritizing manual links
+    // This way we don't overwrite user's manual associations
+    const combinedLinks = { ...smartMatchedLinks, ...manualLinks };
+    
+    // Save to localStorage
+    localStorage.setItem(SOLUTION_LINKS_KEY, JSON.stringify(combinedLinks));
+    
+    // Reload contests to show new matches
+    // This is important since we need to refresh the UI state
+    
+    return {
+      stats,
+      totalMatched: stats.matched,
+      totalContests: stats.total,
+      totalSkipped: stats.skipped || 0
+    };
+  } catch (error) {
+    console.error('Error performing smart matching:', error);
+    return {
+      stats: { error: error.message },
+      totalMatched: 0,
+      totalContests: contests.length,
+      totalSkipped: 0
+    };
   }
 } 

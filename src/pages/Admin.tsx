@@ -6,12 +6,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
-import { AlertCircle, Youtube, Save, Search, Clipboard, CheckCircle, Loader2, RefreshCw } from 'lucide-react';
+import { AlertCircle, Youtube, Save, Search, Clipboard, CheckCircle, Loader2, RefreshCw, Zap } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 import { getEnvironmentConfig, setEnvironmentConfig } from '@/utils/env';
 import { fetchAllContests } from '@/utils/api';
+import { performSmartMatching } from '@/utils/api/solutions';
 import { BookmarkedContest, YouTubeVideo, Platform } from '@/utils/types';
 import { PLATFORMS, YOUTUBE_PLAYLISTS } from '@/utils/constants';
 import { fetchPlaylistVideos } from '@/services/youtube';
@@ -30,6 +32,8 @@ const Admin = () => {
   const [selectedContest, setSelectedContest] = useState<string>('');
   const [solutionLink, setSolutionLink] = useState('');
   const [savingSolution, setSavingSolution] = useState(false);
+  const [smartMatchStats, setSmartMatchStats] = useState<Record<string, any> | null>(null);
+  const [runningSmartMatch, setRunningSmartMatch] = useState(false);
 
   // Load saved settings on mount
   useEffect(() => {
@@ -309,37 +313,134 @@ const Admin = () => {
     }
   };
 
+  // Run smart matching
+  const runSmartMatching = async () => {
+    if (!youtubeApiKey) {
+      toast({
+        title: 'API Key Required',
+        description: 'Please set your YouTube API key in the API Settings tab before running Smart Match.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    try {
+      setRunningSmartMatch(true);
+      setSmartMatchStats(null);
+      
+      toast({
+        title: 'Smart Match Started',
+        description: 'Finding solution videos for contests. This may take a moment...',
+      });
+      
+      // Run smart matching on all contests
+      const result = await performSmartMatching(contests);
+      
+      setSmartMatchStats(result.stats);
+      
+      const toastMessage = result.totalSkipped > 0 
+        ? `Found solutions for ${result.totalMatched} out of ${result.totalContests - result.totalSkipped} processed contests. (${result.totalSkipped} already had manual links)`
+        : `Found solutions for ${result.totalMatched} out of ${result.totalContests} contests.`;
+        
+      toast({
+        title: 'Smart Match Complete',
+        description: toastMessage,
+      });
+      
+      // Reload contests to show the newly linked solutions
+      await fetchRealContests();
+      
+    } catch (error) {
+      console.error('Error running smart match:', error);
+      toast({
+        title: 'Smart Match Failed',
+        description: 'An error occurred while matching contests with videos.',
+        variant: 'destructive'
+      });
+    } finally {
+      setRunningSmartMatch(false);
+    }
+  };
+
   return (
     <Layout>
-      <div className="max-w-6xl mx-auto px-4 py-6">
-        <Tabs defaultValue="manage-solutions" className="space-y-6">
+      <div className="container py-8">
+        <Tabs defaultValue="solutions" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="manage-solutions">Manage Solutions</TabsTrigger>
-            <TabsTrigger value="api-settings">API Settings</TabsTrigger>
+            <TabsTrigger value="solutions">Solution Links</TabsTrigger>
+            <TabsTrigger value="settings">API Settings</TabsTrigger>
           </TabsList>
           
-          {/* Manage Solutions Tab - Combined Interface */}
-          <TabsContent value="manage-solutions" className="space-y-6">
-            <div className="grid md:grid-cols-2 gap-6">
-              {/* Left side - Contest Selection */}
+          <TabsContent value="solutions" className="mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Left side - Contest Browser */}
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <div>
-                    <CardTitle>Past Contests</CardTitle>
-                    <CardDescription>
-                      Select a contest to add or update its solution link
-                    </CardDescription>
-                  </div>
-                  <Button 
-                    variant="outline" 
-                    size="icon"
-                    onClick={fetchRealContests}
-                    disabled={fetchingContests}
-                  >
-                    <RefreshCw className={`h-4 w-4 ${fetchingContests ? 'animate-spin' : ''}`} />
-                  </Button>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Youtube className="h-5 w-5 text-red-500" />
+                    Contest Solution Links
+                  </CardTitle>
+                  <CardDescription>
+                    Manage contest solution video links for your contests
+                  </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent className="space-y-4">
+                  {/* Smart Match Button */}
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-medium">Smart Match</h3>
+                      <p className="text-xs text-muted-foreground">
+                        Automatically match contests with solution videos
+                      </p>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      className="gap-2"
+                      disabled={runningSmartMatch || !youtubeApiKey}
+                      onClick={runSmartMatching}
+                    >
+                      {runningSmartMatch ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Zap className="h-4 w-4 text-yellow-500" />
+                      )}
+                      Smart Match
+                    </Button>
+                  </div>
+                  
+                  {/* Smart Match Stats */}
+                  {smartMatchStats && (
+                    <Alert className="mt-4">
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <h4 className="font-medium text-sm">Match Results</h4>
+                          <Badge variant="outline" className="px-2 py-0">
+                            {smartMatchStats.matchRate}% matched
+                          </Badge>
+                        </div>
+                        <div className="text-xs">
+                          <p className="text-muted-foreground">
+                            Found {smartMatchStats.matched} solutions out of {smartMatchStats.total} contests
+                            {smartMatchStats.skipped > 0 && 
+                              ` (${smartMatchStats.skipped} already had manual links)`}
+                          </p>
+                          {Object.entries(smartMatchStats.platforms).map(([platform, data]: [string, any]) => (
+                            <div key={platform} className="mt-1">
+                              <span className="font-medium">{PLATFORMS[platform as Platform]?.name}:</span>{' '}
+                              <span>
+                                {data.matched}/{data.total} 
+                                {data.skipped > 0 && ` (${data.skipped} skipped)`}
+                                {data.total > 0 && data.skipped < data.total ? 
+                                  ` (${((data.matched / (data.total - data.skipped)) * 100).toFixed(0)}%)` : 
+                                  ' (0%)'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </Alert>
+                  )}
+                  
                   <div className="space-y-2">
                     <Label htmlFor="platform">Filter by Platform</Label>
                     <Select 
@@ -558,73 +659,62 @@ const Admin = () => {
           </TabsContent>
           
           {/* API Settings Tab */}
-          <TabsContent value="api-settings" className="space-y-6">
+          <TabsContent value="settings" className="mt-6">
             <Card>
               <CardHeader>
-                <CardTitle>YouTube API Settings</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Youtube className="h-5 w-5 text-red-500" />
+                  YouTube API Settings
+                </CardTitle>
                 <CardDescription>
-                  Configure your YouTube API key to enable video browsing functionality.
+                  Set up your YouTube API for contest solution integration
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <Alert variant="warning" className="mb-6">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Important Information</AlertTitle>
-                  <AlertDescription>
-                    <p className="mb-2">
-                      The YouTube API key is stored in your browser's localStorage and is only used for
-                      fetching videos on your device. Never share your API key with others.
-                    </p>
-                    <a
-                      href="https://developers.google.com/youtube/v3/getting-started"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline"
-                    >
-                      Learn more about the YouTube Data API v3
-                    </a>
-                  </AlertDescription>
-                </Alert>
-                
-                <div className="space-y-4">
+              <CardContent>
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  saveYoutubeSettings();
+                }} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="youtube-api-key">YouTube API Key</Label>
+                    <Label htmlFor="youtubeApiKey">YouTube API Key</Label>
                     <Input
-                      id="youtube-api-key"
+                      id="youtubeApiKey"
                       type="password"
-                      placeholder="Enter your YouTube Data API v3 key"
+                      placeholder="Enter your YouTube API key"
                       value={youtubeApiKey}
                       onChange={(e) => setYoutubeApiKey(e.target.value)}
+                      disabled={loading}
                     />
                     <p className="text-sm text-muted-foreground">
-                      Get your API key from the <a 
-                        href="https://console.cloud.google.com/apis/credentials" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-primary hover:underline"
-                      >
-                        Google Cloud Console
-                      </a>
+                      Create a YouTube API key from the <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" className="underline">Google Cloud Console</a>
                     </p>
                   </div>
                   
-                  <Alert className="bg-muted">
-                    <p className="text-sm text-foreground">
-                      <strong>Note:</strong> This app automatically uses the relevant YouTube playlists for each platform.
-                      When you select a platform in the Manage Solutions tab, the appropriate playlist will be loaded.
+                  <div className="space-y-2">
+                    <Label htmlFor="youtubePlaylistUrl">Playlist URL (Optional)</Label>
+                    <Input
+                      id="youtubePlaylistUrl"
+                      placeholder="Enter a YouTube playlist URL"
+                      value={youtubePlaylistUrl}
+                      onChange={(e) => setYoutubePlaylistUrl(e.target.value)}
+                      disabled={loading}
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      If not specified, platform-specific playlists will be used
                     </p>
-                  </Alert>
-                </div>
+                  </div>
+                  
+                  <div className="pt-2">
+                    <Button 
+                      type="submit" 
+                      disabled={loading}
+                    >
+                      {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {loading ? 'Saving...' : 'Save Settings'}
+                    </Button>
+                  </div>
+                </form>
               </CardContent>
-              <CardFooter>
-                <Button 
-                  onClick={saveYoutubeSettings}
-                  disabled={loading}
-                  className="ml-auto"
-                >
-                  {loading ? 'Saving...' : 'Save Settings'}
-                </Button>
-              </CardFooter>
             </Card>
           </TabsContent>
         </Tabs>
